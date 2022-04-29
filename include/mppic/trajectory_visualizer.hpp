@@ -4,7 +4,8 @@
 
 #include <memory>
 #include <string>
-#include <xtensor/xtensor.hpp>
+
+#include <torch/torch.h>
 
 #include "nav_msgs/msg/path.hpp"
 #include "rclcpp/rclcpp.hpp"
@@ -25,9 +26,9 @@ public:
   void on_activate();
   void on_deactivate();
 
-  void add(const xt::xtensor<double, 2> & trajectory);
+  void add(const torch::Tensor & trajectory);
   void add(
-    const xt::xtensor<double, 3> & trajectories, const size_t batch_step,
+    const torch::Tensor & trajectories, const size_t batch_step,
     const size_t time_step);
   void visualize(nav_msgs::msg::Path plan);
   void reset();

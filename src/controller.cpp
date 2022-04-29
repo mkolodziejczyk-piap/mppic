@@ -2,8 +2,8 @@
 #include <stdint.h>
 #include <chrono>
 #include "mppic/controller.hpp"
-#include "mppic/motion_models.hpp"
-#include "mppic/utils.hpp"
+// #include "mppic/motion_models.hpp"
+// #include "mppic/utils.hpp"
 
 namespace mppi
 {
@@ -25,30 +25,30 @@ void Controller::configure(
   getParam(visualize_, "visualize", false);
 
   // Configure composed objects
-  optimizer_.initialize(parent_, name_, costmap_ros_, parameters_handler_.get());
+  // optimizer_.initialize(parent_, name_, costmap_ros_, parameters_handler_.get());
   path_handler_.initialize(parent_, name_, costmap_ros_, tf_buffer_, parameters_handler_.get());
-  trajectory_visualizer_.on_configure(parent_, costmap_ros_->getGlobalFrameID());
+  // trajectory_visualizer_.on_configure(parent_, costmap_ros_->getGlobalFrameID());
 
   RCLCPP_INFO(logger_, "Configured MPPI Controller: %s", name_.c_str());
 }
 
 void Controller::cleanup()
 {
-  trajectory_visualizer_.on_cleanup();
+  // trajectory_visualizer_.on_cleanup();
   parameters_handler_.reset();
   RCLCPP_INFO(logger_, "Cleaned up MPPI Controller: %s", name_.c_str());
 }
 
 void Controller::activate()
 {
-  trajectory_visualizer_.on_activate();
+  // trajectory_visualizer_.on_activate();
   parameters_handler_->start();
   RCLCPP_INFO(logger_, "Activated MPPI Controller: %s", name_.c_str());
 }
 
 void Controller::deactivate()
 {
-  trajectory_visualizer_.on_deactivate();
+  // trajectory_visualizer_.on_deactivate();
   RCLCPP_INFO(logger_, "Deactivated MPPI Controller: %s", name_.c_str());
 }
 
@@ -61,25 +61,26 @@ geometry_msgs::msg::TwistStamped Controller::computeVelocityCommands(
   nav_msgs::msg::Path transformed_plan = path_handler_.transformPath(robot_pose);
   geometry_msgs::msg::TwistStamped cmd =
     optimizer_.evalControl(robot_pose, robot_speed, transformed_plan, goal_checker);
+  geometry_msgs::msg::TwistStamped cmd;
 
-  visualize(robot_pose, robot_speed, std::move(transformed_plan));
+  // visualize(robot_pose, robot_speed, std::move(transformed_plan));
 
   return cmd;
 }
 
-void Controller::visualize(
-  const geometry_msgs::msg::PoseStamped & robot_pose,
-  const geometry_msgs::msg::Twist & robot_speed,
-  nav_msgs::msg::Path transformed_plan)
-{
-  if (!visualize_) {
-    return;
-  }
+// void Controller::visualize(
+//   const geometry_msgs::msg::PoseStamped & robot_pose,
+//   const geometry_msgs::msg::Twist & robot_speed,
+//   nav_msgs::msg::Path transformed_plan)
+// {
+//   if (!visualize_) {
+//     return;
+//   }
 
-  trajectory_visualizer_.add(optimizer_.getGeneratedTrajectories(), 5, 2);
-  trajectory_visualizer_.add(optimizer_.evalTrajectoryFromControlSequence(robot_pose, robot_speed));
-  trajectory_visualizer_.visualize(std::move(transformed_plan));
-}
+//   trajectory_visualizer_.add(optimizer_.getGeneratedTrajectories(), 5, 2);
+//   trajectory_visualizer_.add(optimizer_.evalTrajectoryFromControlSequence(robot_pose, robot_speed));
+//   trajectory_visualizer_.visualize(std::move(transformed_plan));
+// }
 
 void Controller::setPlan(const nav_msgs::msg::Path & path)
 {
@@ -88,7 +89,7 @@ void Controller::setPlan(const nav_msgs::msg::Path & path)
 
 void Controller::setSpeedLimit(const double & speed_limit, const bool & percentage)
 {
-  optimizer_.setSpeedLimit(speed_limit, percentage);
+  // optimizer_.setSpeedLimit(speed_limit, percentage);
 }
 
 }  // namespace mppi

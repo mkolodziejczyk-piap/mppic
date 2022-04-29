@@ -7,9 +7,10 @@
 
 #include "mppic/path_handler.hpp"
 #include "mppic/optimizer.hpp"
-#include "mppic/trajectory_visualizer.hpp"
-#include "mppic/models/constraints.hpp"
-#include "mppic/utils.hpp"
+// #include "mppic/trajectory_visualizer.hpp"
+// #include "mppic/models/constraints.hpp"
+// #include "mppic/utils.hpp"
+#include "mppic/parameters_handler.hpp"
 
 #include "nav2_core/controller.hpp"
 #include "nav2_core/goal_checker.hpp"
@@ -42,10 +43,10 @@ public:
   void setSpeedLimit(const double & speed_limit, const bool & percentage) override;
 
 protected:
-  void visualize(
-    const geometry_msgs::msg::PoseStamped & robot_pose,
-    const geometry_msgs::msg::Twist & robot_speed,
-    nav_msgs::msg::Path transformed_plan);
+  // void visualize(
+  //   const geometry_msgs::msg::PoseStamped & robot_pose,
+  //   const geometry_msgs::msg::Twist & robot_speed,
+  //   nav_msgs::msg::Path transformed_plan);
 
   std::string name_;
   rclcpp_lifecycle::LifecycleNode::WeakPtr parent_;
@@ -54,9 +55,9 @@ protected:
   std::shared_ptr<tf2_ros::Buffer> tf_buffer_;
 
   std::unique_ptr<ParametersHandler> parameters_handler_;
-  Optimizer optimizer_;
+  // Optimizer optimizer_;
   PathHandler path_handler_;
-  TrajectoryVisualizer trajectory_visualizer_;
+  // TrajectoryVisualizer trajectory_visualizer_;
 
   bool visualize_;
 };

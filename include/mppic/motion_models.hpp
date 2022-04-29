@@ -24,10 +24,10 @@ public:
    * @return predicted velocities of the robot: tensor of shape [batch_size, ... ]
    * where last dim could be 2 or 3 depending on motion model used
    */
-  virtual xt::xtensor<double, 2> predict(
-    const xt::xtensor<double, 2> & state, const models::StateIdxes & idx)
+  virtual torch::Tensor predict(
+    const torch::Tensor & state, const models::StateIdxes & idx)
   {
-    return xt::view(state, xt::all(), xt::range(idx.cbegin(), idx.cend()));
+    return state.index({"...", Slice(idx.cbegin(), idx.cend())});
   }
 
   virtual bool isHolonomic() const = 0;
@@ -48,8 +48,8 @@ public:
 class AckermannMotionModel : public MotionModel
 {
 public:
-  xt::xtensor<double, 2> predict(
-    const xt::xtensor<double, 2> & /*state*/, const models::StateIdxes & /*idx*/) override
+  torch::Tensor predict(
+    const torch::Tensor & /*state*/, const models::StateIdxes & /*idx*/) override
   {
     throw std::runtime_error("Ackermann motion model not yet implemented");
   }

@@ -6,7 +6,7 @@
 #include <string>
 #include <vector>
 #include <pluginlib/class_loader.hpp>
-#include <xtensor/xtensor.hpp>
+#include <torch/torch.h>
 
 #include "geometry_msgs/msg/pose_stamped.hpp"
 #include "geometry_msgs/msg/twist.hpp"
@@ -38,9 +38,9 @@ public:
    * where 3 stands for x, y, yaw
    * @return Cost for each trajectory
    */
-  xt::xtensor<double, 1> evalTrajectoriesScores(
+  torch::Tensor evalTrajectoriesScores(
     const models::State &,
-    const xt::xtensor<double, 3> & trajectories,
+    const torch::Tensor & trajectories,
     const nav_msgs::msg::Path & global_plan,
     const geometry_msgs::msg::PoseStamped & robot_pose,
     nav2_core::GoalChecker *) const;

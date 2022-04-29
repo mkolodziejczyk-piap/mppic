@@ -34,8 +34,8 @@ void ReferenceTrajectoryCritic::initialize()
 
 void ReferenceTrajectoryCritic::score(
   const geometry_msgs::msg::PoseStamped & robot_pose, const models::State & /*state*/,
-  const xt::xtensor<double, 3> & trajectories,
-  const xt::xtensor<double, 2> & path, xt::xtensor<double, 1> & costs,
+  const torch::Tensor & trajectories,
+  const torch::Tensor & path, torch::Tensor & costs,
   nav2_core::GoalChecker * goal_checker)
 {
   if (utils::withinPositionGoalTolerance(goal_checker, robot_pose, path)) {
@@ -53,14 +53,13 @@ void ReferenceTrajectoryCritic::score(
 
   // see http://paulbourke.net/geometry/pointlineplane/
   const auto & P3 = trajectories;  // P3 points from which we calculate distance to segments
-  auto P1 = xt::view(path, xt::range(_, -1), xt::all());  // segments start points
-  auto P2 = xt::view(path, xt::range(1, _), xt::all());  // segments end points
+  auto P1 = path.index({Slice(None, -1), "..."});  // segments start points
+  auto P2 = path.index({Slice(1, None), "..."});  // segments end points
 
-  xt::xtensor<double, 2> P2_P1_diff = P2 - P1;
-  xt::xtensor<double, 1> P2_P1_norm_sq =
+  torch::Tensor P2_P1_diff = P2 - P1;
+  torch::Tensor P2_P1_norm_sq =
     xt::norm_sq(
-    P2_P1_diff, {P2_P1_diff.dimension() - 1},
-    xt::evaluation_strategy::immediate);
+    P2_P1_diff, {P2_P1_diff.dimension() - 1});
 
   auto evaluate_u = [&P1, &P3, &P2_P1_diff, &P2_P1_norm_sq](
     size_t t, size_t p, size_t s) -> double {

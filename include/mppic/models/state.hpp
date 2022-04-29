@@ -5,9 +5,9 @@
 #include <array>
 #include <cstdint>
 
-#include <xtensor/xtensor.hpp>
-#include <xtensor/xview.hpp>
-#include <xtensor/xarray.hpp>
+#include <torch/torch.h>
+
+using namespace torch::indexing;
 
 namespace mppi::models
 {
@@ -84,102 +84,102 @@ private:
  **/
 struct State
 {
-  xt::xtensor<double, 3> data;
+  torch::Tensor data;
   StateIdxes idx;
 
   void reset(unsigned int batch_size, unsigned int time_steps)
   {
-    data = xt::zeros<double>({batch_size, time_steps, idx.dim()});
+    data = torch::zeros({batch_size, time_steps, idx.dim()});
   }
 
   auto getVelocitiesVX() const
   {
-    return xt::view(data, xt::all(), xt::all(), idx.vx());
+    return data.index({"...", idx.vx()});
   }
 
   auto getVelocitiesVX()
   {
-    return xt::view(data, xt::all(), xt::all(), idx.vx());
+    return data.index({"...", idx.vx()});
   }
 
   auto getVelocitiesVY()
   {
-    return xt::view(data, xt::all(), xt::all(), idx.vy());
+    return data.index({"...", idx.vy()});
   }
 
   auto getVelocitiesVY() const
   {
-    return xt::view(data, xt::all(), xt::all(), idx.vy());
+    return data.index({"...", idx.vy()});
   }
 
   auto getVelocitiesWZ() const
   {
-    return xt::view(data, xt::all(), xt::all(), idx.wz());
+    return data.index({"...", idx.wz()});
   }
 
   auto getVelocitiesWZ()
   {
-    return xt::view(data, xt::all(), xt::all(), idx.wz());
+    return data.index({"...", idx.wz()});
   }
 
   auto getControlVelocitiesVX() const
   {
-    return xt::view(data, xt::all(), xt::all(), idx.cvx());
+    return data.index({"...", idx.cvx()});
   }
 
   auto getControlVelocitiesVX()
   {
-    return xt::view(data, xt::all(), xt::all(), idx.cvx());
+    return data.index({"...", idx.cvx()});
   }
 
   auto getControlVelocitiesVY()
   {
-    return xt::view(data, xt::all(), xt::all(), idx.cvy());
+    return data.index({"...", idx.cvy()});
   }
 
   auto getControlVelocitiesVY() const
   {
-    return xt::view(data, xt::all(), xt::all(), idx.cvy());
+    return data.index({"...", idx.cvy()});
   }
 
   auto getControlVelocitiesWZ() const
   {
-    return xt::view(data, xt::all(), xt::all(), idx.cwz());
+    return data.index({"...", idx.cwz()});
   }
 
   auto getControlVelocitiesWZ()
   {
-    return xt::view(data, xt::all(), xt::all(), idx.cwz());
+    return data.index({"...", idx.cwz()});
   }
 
   auto getTimeIntervals()
   {
-    return xt::view(data, xt::all(), xt::all(), idx.dt());
+    return data.index({"...", idx.dt()});
   }
 
   auto getTimeIntervals() const
   {
-    return xt::view(data, xt::all(), xt::all(), idx.dt());
+    return data.index({"...", idx.dt()});
   }
 
   auto getControls() const
   {
-    return xt::view(data, xt::all(), xt::all(), xt::range(idx.cbegin(), idx.cend()));
+    return data.index({"...", Slice(idx.cbegin(), idx.cend())});
   }
 
   auto getControls()
   {
-    return xt::view(data, xt::all(), xt::all(), xt::range(idx.cbegin(), idx.cend()));
+    return data.index({"...", Slice(idx.cbegin(), idx.cend())});
   }
 
   auto getVelocities() const
   {
-    return xt::view(data, xt::all(), xt::all(), xt::range(idx.vbegin(), idx.vend()));
+    return data.index({"...", Slice(idx.vbegin(), idx.vend())});
   }
 
   auto getVelocities()
   {
-    return xt::view(data, xt::all(), xt::all(), xt::range(idx.vbegin(), idx.vend()));
+    return data.index({"...", Slice(idx.vbegin(), idx.vend())});
   }
 };
 

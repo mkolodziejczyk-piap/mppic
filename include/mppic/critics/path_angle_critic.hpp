@@ -21,8 +21,8 @@ public:
    */
   void score(
     const geometry_msgs::msg::PoseStamped & robot_pose,
-    const models::State & state, const xt::xtensor<double, 3> & trajectories,
-    const xt::xtensor<double, 2> & path, xt::xtensor<double, 1> & costs,
+    const models::State & state, torch::Tensor & trajectories,
+    const torch::Tensor & path, torch::Tensor & costs,
     nav2_core::GoalChecker * goal_checker) override;
 
 protected:

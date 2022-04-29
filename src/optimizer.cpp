@@ -6,12 +6,12 @@
 #include <stdexcept>
 #include <string>
 #include <vector>
-#include <xtensor/xmath.hpp>
-#include <xtensor/xrandom.hpp>
 
 #include "nav2_core/exceptions.hpp"
 #include "nav2_costmap_2d/cost_values.hpp"
 #include "nav2_costmap_2d/costmap_filters/filter_values.hpp"
+
+using namespace torch::indexing;
 
 namespace mppi
 {
@@ -156,7 +156,7 @@ void Optimizer::shiftControlSequence()
     xt::all());
 }
 
-xt::xtensor<double, 3> Optimizer::generateNoisedTrajectories(
+torch::Tensor Optimizer::generateNoisedTrajectories(
   const geometry_msgs::msg::PoseStamped & robot_pose,
   const geometry_msgs::msg::Twist & robot_speed)
 {
@@ -166,25 +166,29 @@ xt::xtensor<double, 3> Optimizer::generateNoisedTrajectories(
   return integrateStateVelocities(state_, robot_pose);
 }
 
-xt::xtensor<double, 3> Optimizer::generateNoisedControls() const
+torch::Tensor Optimizer::generateNoisedControls() const
 {
   auto & s = settings_;
-  auto vx_noises = xt::random::randn<double>(
-    {s.batch_size_, s.time_steps_, 1U},
-    0.0, s.sampling_std_.vx);
-  auto wz_noises = xt::random::randn<double>(
-    {s.batch_size_, s.time_steps_, 1U},
-    0.0, s.sampling_std_.wz);
+  auto vx_noises = torch::randn(
+    {s.batch_size_, s.time_steps_, 1U}) * s.sampling_std_.vx;
+  auto wz_noises = torch::randn(
+    {s.batch_size_, s.time_steps_, 1U}) * s.sampling_std_.wz;
 
   if (isHolonomic()) {
-    auto vy_noises = xt::random::randn<double>(
+    auto vy_noises = torch::randn(
       {s.batch_size_, s.time_steps_, 1U}, 0.0, s.sampling_std_.vy);
     return control_sequence_.data +
-           xt::concatenate(xt::xtuple(vx_noises, vy_noises, wz_noises), 2);
+           torch::cat({vx_noises, vy_noises, wz_noises}, -1);
   }
 
   return control_sequence_.data +
-         xt::concatenate(xt::xtuple(vx_noises, wz_noises), 2);
+         torch::cat({vx_noises, wz_noises}, -1);
+
+  //TODO allocate control_sequence_ at once
+  /*
+
+
+  */
 }
 
 bool Optimizer::isHolonomic() const {return motion_model_->isHolonomic();}
@@ -197,11 +201,12 @@ void Optimizer::applyControlConstraints()
 
   if (isHolonomic()) {
     auto vy = state_.getControlVelocitiesVY();
-    vy = xt::clip(vy, -s.constraints_.vy, s.constraints_.vy);
+    vy = torch::clip(vy, -s.constraints_.vy, s.constraints_.vy);
   }
 
-  vx = xt::clip(vx, -s.constraints_.vx, s.constraints_.vx);
-  wz = xt::clip(wz, -s.constraints_.wz, s.constraints_.wz);
+  vx = torch::clip(vx, -s.constraints_.vx, s.constraints_.vx);
+  wz = torch::clip(wz, -s.constraints_.wz, s.constraints_.wz);
+  //TODO one clip on whole state_ ?
 }
 
 void Optimizer::updateStateVelocities(
@@ -214,31 +219,27 @@ void Optimizer::updateStateVelocities(
 void Optimizer::updateInitialStateVelocities(
   models::State & state, const geometry_msgs::msg::Twist & robot_speed) const
 {
-  xt::view(state.getVelocitiesVX(), xt::all(), 0) = robot_speed.linear.x;
-  xt::view(state.getVelocitiesWZ(), xt::all(), 0) = robot_speed.angular.z;
+  state.getVelocitiesVX().index_put_({0}, robot_speed.linear.x);
+  state.getVelocitiesWZ().index_put_({0}, robot_speed.angular.z);
 
   if (isHolonomic()) {
-    xt::view(state.getVelocitiesVY(), xt::all(), 0) = robot_speed.linear.y;
+    state.getVelocitiesVY().index_put_({0}, robot_speed.linear.y);
   }
 }
 
+// this is trajectory rollout
 void Optimizer::propagateStateVelocitiesFromInitials(
   models::State & state) const
 {
-  using namespace xt::placeholders;  // NOLINT
-
   for (size_t i = 0; i < settings_.time_steps_ - 1; i++) {
-    auto curr_state = xt::view(state.data, xt::all(), i);
-    auto next_velocities =
-      xt::view(
-      state.data, xt::all(), i + 1,
-      xt::range(state.idx.vbegin(), state.idx.vend()));
+    auto curr_state = state.data.index({"...", i});
+    auto next_velocities = state.data.index({"...", i + 1, torch::Slice(state.idx.vbegin(), state.idx.vend())});
 
-    next_velocities = motion_model_->predict(curr_state, state.idx);
+    next_velocities = motion_model_->predict(curr_state, state.idx); //TODO where is real predict?
   }
 }
 
-xt::xtensor<double, 2> Optimizer::evalTrajectoryFromControlSequence(
+torch::Tensor Optimizer::evalTrajectoryFromControlSequence(
   const geometry_msgs::msg::PoseStamped & robot_pose,
   const geometry_msgs::msg::Twist & robot_speed) const
 {
@@ -252,28 +253,27 @@ xt::xtensor<double, 2> Optimizer::evalTrajectoryFromControlSequence(
   return xt::squeeze(integrateStateVelocities(state, robot_pose));
 }
 
-xt::xtensor<double, 3> Optimizer::integrateStateVelocities(
+torch::Tensor Optimizer::integrateStateVelocities(
   const models::State & state,
   const geometry_msgs::msg::PoseStamped & pose) const
 {
-  using namespace xt::placeholders;  // NOLINT
 
   auto w = state.getVelocitiesWZ();
   double initial_yaw = tf2::getYaw(pose.pose.orientation);
-  xt::xtensor<double, 2> yaw =
-    xt::cumsum(w * settings_.model_dt_, 1) + initial_yaw;
-  xt::xtensor<double, 2> yaw_offseted = yaw;
+  torch::Tensor yaw =
+    torch::cumsum(w * settings_.model_dt_, 1) + initial_yaw;
+  torch::Tensor yaw_offseted = yaw;
 
-  xt::view(yaw_offseted, xt::all(), xt::range(1, _)) =
-    xt::view(yaw, xt::all(), xt::range(_, -1));
-  xt::view(yaw_offseted, xt::all(), 0) = initial_yaw;
+  yaw_offseted.index_put_({"...", Slice(1, None)}) =
+    yaw.index({"...", Slice(None, -1)}); //TODO roll() ?
+  yaw_offseted.index_put_({"...", 0}) = initial_yaw;
 
-  auto yaw_cos = xt::eval(xt::cos(yaw_offseted));
-  auto yaw_sin = xt::eval(xt::sin(yaw_offseted));
+  auto yaw_cos = torch::cos(yaw_offseted);
+  auto yaw_sin = torch::sin(yaw_offseted);
 
   auto vx = state.getVelocitiesVX();
-  auto dx = xt::eval(vx * yaw_cos);
-  auto dy = xt::eval(vx * yaw_sin);
+  auto dx = vx * yaw_cos;
+  auto dy = vx * yaw_sin;
 
   if (isHolonomic()) {
     auto vy = state.getVelocitiesVY();
@@ -281,15 +281,12 @@ xt::xtensor<double, 3> Optimizer::integrateStateVelocities(
     dy = dy + vy * yaw_cos;
   }
 
-  auto x = pose.pose.position.x + xt::cumsum(dx * settings_.model_dt_, 1);
-  auto y = pose.pose.position.y + xt::cumsum(dy * settings_.model_dt_, 1);
+  auto x = pose.pose.position.x + torch::cumsum(dx * settings_.model_dt_, 1);
+  auto y = pose.pose.position.y + torch::cumsum(dy * settings_.model_dt_, 1);
 
-  return xt::concatenate(
-    xt::xtuple(
-      xt::view(x, xt::all(), xt::all(), xt::newaxis()),
-      xt::view(y, xt::all(), xt::all(), xt::newaxis()),
-      xt::view(yaw, xt::all(), xt::all(), xt::newaxis())),
-    2);
+  return torch::cat(
+    {x, y, yaw}, //TODO newaxis?
+    }); //TODO axis?
 }
 
 void Optimizer::updateControlSequence(const xt::xtensor<double, 1> & costs)
@@ -341,7 +338,7 @@ void Optimizer::setMotionModel(const std::string & model)
   control_sequence_.idx.setLayout(motion_model_->isHolonomic());
 }
 
-xt::xtensor<double, 3> & Optimizer::getGeneratedTrajectories()
+torch::Tensor & Optimizer::getGeneratedTrajectories()
 {
   return generated_trajectories_;
 }

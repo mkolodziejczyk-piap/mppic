@@ -4,8 +4,9 @@
 
 #include <string>
 #include <memory>
-#include <xtensor/xtensor.hpp>
-#include <xtensor/xview.hpp>
+// #include <xtensor/xtensor.hpp>
+// #include <xtensor/xview.hpp>
+#include <torch/torch.h>
 
 #include "builtin_interfaces/msg/time.hpp"
 #include "geometry_msgs/msg/pose_stamped.hpp"
@@ -29,8 +30,8 @@ namespace mppi
 class Optimizer
 {
 public:
-  using model_t = xt::xtensor<double, 2>(
-    const xt::xtensor<double, 2> & state, const models::StateIdxes & idx);
+  // using model_t = xt::xtensor<double, 2>(
+  //   const xt::xtensor<double, 2> & state, const models::StateIdxes & idx);
 
   Optimizer() = default;
 
@@ -45,9 +46,9 @@ public:
     const geometry_msgs::msg::Twist & robot_speed, const nav_msgs::msg::Path & plan,
     nav2_core::GoalChecker * goal_checker);
 
-  xt::xtensor<double, 3> & getGeneratedTrajectories();
+  torch::Tensor & getGeneratedTrajectories();
 
-  xt::xtensor<double, 2> evalTrajectoryFromControlSequence(
+  torch::Tensor evalTrajectoryFromControlSequence(
     const geometry_msgs::msg::PoseStamped & robot_pose,
     const geometry_msgs::msg::Twist & robot_speed) const;
 
@@ -67,7 +68,7 @@ protected:
    * @return trajectories: tensor of shape [ batch_size_, time_steps_, 3 ]
    * where 3 stands for x, y, yaw
    */
-  xt::xtensor<double, 3> generateNoisedTrajectories(
+  torch::Tensor generateNoisedTrajectories(
     const geometry_msgs::msg::PoseStamped & robot_pose,
     const geometry_msgs::msg::Twist & robot_speed);
 
@@ -78,7 +79,7 @@ protected:
    * @return tensor of shape [ batch_size_, time_steps_, 2]
    * where 2 stands for v, w
    */
-  xt::xtensor<double, 3> generateNoisedControls() const;
+  torch::Tensor generateNoisedControls() const;
 
   void applyControlConstraints();
 
@@ -103,7 +104,7 @@ protected:
    */
   void propagateStateVelocitiesFromInitials(models::State & state) const;
 
-  xt::xtensor<double, 3> integrateStateVelocities(
+  torch::Tensor integrateStateVelocities(
     const models::State & state, const geometry_msgs::msg::PoseStamped & robot_pose) const;
 
   /**
@@ -112,7 +113,7 @@ protected:
    *
    * @param trajectories costs, tensor of shape [ batch_size ]
    */
-  void updateControlSequence(const xt::xtensor<double, 1> & costs);
+  void updateControlSequence(const torch::Tensor & costs);
 
   /**
    * @brief Get offseted control from control_sequence_
@@ -143,7 +144,7 @@ protected:
   std::unique_ptr<MotionModel> motion_model_;
   CriticManager critic_manager_;
 
-  xt::xtensor<double, 3> generated_trajectories_;
+  torch::Tensor generated_trajectories_; // [ , , ]
   rclcpp::Logger logger_{rclcpp::get_logger("MPPIController")};
 };
 

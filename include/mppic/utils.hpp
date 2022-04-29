@@ -6,10 +6,7 @@
 #include <chrono>
 #include <string>
 
-#include <xtensor/xarray.hpp>
-#include <xtensor/xnorm.hpp>
-#include <xtensor/xmath.hpp>
-#include <xtensor/xview.hpp>
+#include <torch/torch.h>
 
 #include "geometry_msgs/msg/twist_stamped.hpp"
 #include "mppic/models/control_sequence.hpp"
@@ -19,7 +16,8 @@
 #include "rclcpp/rclcpp.hpp"
 #include "rclcpp_lifecycle/lifecycle_node.hpp"
 #include "tf2/utils.h"
-#include "tf2_geometry_msgs/tf2_geometry_msgs.hpp"
+// #include "tf2_geometry_msgs/tf2_geometry_msgs.hpp"
+#include "tf2_geometry_msgs/tf2_geometry_msgs.h"
 
 namespace mppi::utils
 {
@@ -43,12 +41,12 @@ geometry_msgs::msg::TwistStamped toTwistStamped(
   return twist;
 }
 
-inline xt::xtensor<double, 2> toTensor(const nav_msgs::msg::Path & path)
+inline torch::Tensor toTensor(const nav_msgs::msg::Path & path)
 {
   size_t path_size = path.poses.size();
   static constexpr size_t last_dim_size = 3;
 
-  xt::xtensor<double, 2> points = xt::empty<double>({path_size, last_dim_size});
+  torch::Tensor points = torch::empty({path_size, last_dim_size});
 
   for (size_t i = 0; i < path_size; ++i) {
     points(i, 0) = static_cast<double>(path.poses[i].pose.position.x);
@@ -63,7 +61,7 @@ inline xt::xtensor<double, 2> toTensor(const nav_msgs::msg::Path & path)
 inline bool withinPositionGoalTolerance(
   nav2_core::GoalChecker * goal_checker,
   const geometry_msgs::msg::PoseStamped & robot_pose_arg,
-  const xt::xtensor<double, 2> & path)
+  const torch::Tensor & path)
 {
   if (goal_checker) {
     geometry_msgs::msg::Pose pose_tol;
@@ -72,12 +70,12 @@ inline bool withinPositionGoalTolerance(
 
     const double & goal_tol = pose_tol.position.x;
 
-    xt::xtensor<double, 1> robot_pose = {
+    torch::Tensor robot_pose = {
       static_cast<double>(robot_pose_arg.pose.position.x),
       static_cast<double>(robot_pose_arg.pose.position.y)};
-    auto goal_pose = xt::view(path, -1, xt::range(0, 2));
+    auto goal_pose = path.index({-1, Slice(0, 2)});
 
-    double dist_to_goal = xt::norm_l2(robot_pose - goal_pose, {0})();
+    double dist_to_goal = torch::linalg::norm(robot_pose - goal_pose); //TODO axis
 
     if (dist_to_goal < goal_tol) {
       return true;
@@ -96,9 +94,9 @@ inline bool withinPositionGoalTolerance(
   *
   */
 template<typename T>
-xt::xtensor<double, 2> normalize_angles(const T & angles)
+torch::Tensor normalize_angles(const T & angles)
 {
-  xt::xtensor<double, 2> theta = xt::fmod(angles + M_PI, 2.0 * M_PI);
+  torch::Tensor theta = (angles + M_PI).reminder(2.0 * M_PI);
   return xt::where(theta <= 0.0, theta + M_PI, theta - M_PI);
 }
 
@@ -115,7 +113,7 @@ xt::xtensor<double, 2> normalize_angles(const T & angles)
   *
   */
 template<typename F, typename T>
-xt::xtensor<double, 2> shortest_angular_distance(
+torch::Tensor shortest_angular_distance(
   const F & from,
   const T & to)
 {

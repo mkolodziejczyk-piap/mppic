@@ -23,25 +23,25 @@ void GoalAngleCritic::initialize()
 void GoalAngleCritic::score(
   const geometry_msgs::msg::PoseStamped & robot_pose,
   const models::State & /*state*/,
-  const xt::xtensor<double, 3> & trajectories,
-  const xt::xtensor<double, 2> & path,
-  xt::xtensor<double, 1> & costs,
+  const torch::Tensor & trajectories,
+  const torch::Tensor & path,
+  torch::Tensor & costs,
   nav2_core::GoalChecker * /*goal_checker*/)
 {
-  xt::xtensor<double, 1> tensor_pose = {
+  torch::Tensor tensor_pose = torch::Tensor({
     static_cast<double>(robot_pose.pose.position.x),
-    static_cast<double>(robot_pose.pose.position.y)};
+    static_cast<double>(robot_pose.pose.position.y)});
 
-  auto path_points = xt::view(path, -1, xt::range(0, 2));
+  auto path_points = path.index({-1, Slice(0, 2)});
 
   double points_to_goal_dists = xt::norm_l2(tensor_pose - path_points, {0})();
 
   if (points_to_goal_dists < threshold_to_consider_goal_angle_) {
-    auto yaws = xt::view(trajectories, xt::all(), xt::all(), 2);
-    auto goal_yaw = xt::view(path, -1, 2);
+    auto yaws = trajectories.index({"...", 2});
+    auto goal_yaw = path.index({-1, 2});
 
-    costs += xt::pow(
-      xt::mean(xt::abs(utils::shortest_angular_distance(yaws, goal_yaw)), {1}) *
+    costs += torch::pow(
+      torch::mean(torch::abs(utils::shortest_angular_distance(yaws, goal_yaw)), {1}) *
       weight_, power_);
   }
 }

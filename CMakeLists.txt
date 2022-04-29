@@ -2,7 +2,11 @@ cmake_minimum_required(VERSION 3.5)
 project(mppic)
 
 find_package(ament_cmake REQUIRED)
-find_package(xtensor REQUIRED)
+
+# find_package(xtensor REQUIRED)
+# set(Torch_DIR "/opt/libtorch/share/cmake/Torch")
+set(Torch_DIR "/home/miron/libtorch/libtorch/share/cmake/Torch")
+find_package(Torch REQUIRED)
 
 set(dependencies_pkgs
   rclcpp
@@ -24,37 +28,42 @@ foreach(pkg IN LISTS dependencies_pkgs)
   find_package(${pkg} REQUIRED)
 endforeach()
 
-nav2_package()
+# nav2_package()
+if(NOT CMAKE_CXX_STANDARD)
+  set(CMAKE_CXX_STANDARD 17)
+endif()
 
 add_library(mppic SHARED
   src/controller.cpp
-  src/optimizer.cpp
-  src/critic_manager.cpp
-  src/trajectory_visualizer.cpp
-  src/path_handler.cpp
-  src/parameters_handler.cpp
+  # src/optimizer.cpp
+  # src/critic_manager.cpp
+  # src/trajectory_visualizer.cpp
+  # src/path_handler.cpp
+  # src/parameters_handler.cpp
 )
 
-add_library(critics SHARED
-  src/critics/reference_trajectory_critic.cpp
-  src/critics/goal_angle_critic.cpp
-  src/critics/path_angle_critic.cpp
-  src/critics/goal_critic.cpp
-  src/critics/obstacles_critic.cpp
-  src/critics/prefer_forward_critic.cpp
-  src/critics/twirling_critic.cpp
-)
+# add_library(critics SHARED
+#   src/critics/reference_trajectory_critic.cpp
+#   src/critics/goal_angle_critic.cpp
+#   src/critics/path_angle_critic.cpp
+#   src/critics/goal_critic.cpp
+#   src/critics/obstacles_critic.cpp
+#   src/critics/prefer_forward_critic.cpp
+#   src/critics/twirling_critic.cpp
+# )
 
-set(libraries mppic critics)
+# set(libraries mppic critics)
+set(libraries mppic)
 
 foreach(lib IN LISTS libraries)
   target_compile_options(${lib} PUBLIC -fconcepts)
   target_include_directories(${lib} PUBLIC include)
-  target_link_libraries(${lib} xtensor)
+  target_link_libraries(${lib} ${TORCH_LIBRARIES})
   ament_target_dependencies(${lib} ${dependencies_pkgs})
 endforeach()
 
-install(TARGETS mppic critics
+# install(TARGETS mppic critics
+install(TARGETS mppic
   ARCHIVE DESTINATION lib
   LIBRARY DESTINATION lib
   RUNTIME DESTINATION bin
@@ -64,13 +73,13 @@ install(DIRECTORY include/
   DESTINATION include/
 )
 
-if(BUILD_TESTING)
-  find_package(ament_lint_auto REQUIRED)
-  find_package(ament_cmake_gtest REQUIRED)
-  set(ament_cmake_copyright_FOUND TRUE)
-  ament_lint_auto_find_test_dependencies()
-  add_subdirectory(test)
-endif()
+# if(BUILD_TESTING)
+#   find_package(ament_lint_auto REQUIRED)
+#   find_package(ament_cmake_gtest REQUIRED)
+#   set(ament_cmake_copyright_FOUND TRUE)
+#   ament_lint_auto_find_test_dependencies()
+#   add_subdirectory(test)
+# endif()
 
 ament_export_libraries(${libraries})
 ament_export_dependencies(${dependencies_pkgs})

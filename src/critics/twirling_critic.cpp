@@ -17,12 +17,12 @@ void TwirlingCritic::initialize()
 
 void TwirlingCritic::score(
   const geometry_msgs::msg::PoseStamped & /*robot_pose*/, const models::State & state,
-  const xt::xtensor<double, 3> & /*trajectories*/,
-  const xt::xtensor<double, 2> & /*path*/, xt::xtensor<double, 1> & costs,
+  const torch::Tensor & /*trajectories*/,
+  const torch::Tensor & /*path*/, torch::Tensor & costs,
   nav2_core::GoalChecker * /*goal_checker*/)
 {
-  auto wz = xt::abs(state.getVelocitiesWZ());
-  costs += xt::pow(xt::mean(wz, {1}) * weight_, power_);
+  auto wz = torch::abs(state.getVelocitiesWZ());
+  costs += torch::pow(torch::mean(wz, {1}) * weight_, power_);
 }
 
 }  // namespace mppi::critics

@@ -24,6 +24,11 @@ This process is then repeated a number of times and returns a converged solution
 
 This uses the usual ROS tools for dependency management, so please use ``rosdep`` to install the dependencies. 
 
+### libtorch
+
+
+
+
 Note: If running on Ubuntu 20.04 or other OS's that `xtensor` is not released in binary form, please manually install `xtensor` v 0.24.0 and `xtl` v 0.7.0. These are simply headers so the install process is trivially short, unfortunately the `xtensor` project isn't available in package managers in some common-place operating systems (albeit, all necessary ROS OS versions) so you may be required to do this yourself if building from source.
 
 ```

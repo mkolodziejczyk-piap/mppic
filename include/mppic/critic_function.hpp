@@ -5,9 +5,7 @@
 #include <string>
 #include <memory>
 
-#include <xtensor/xtensor.hpp>
-#include <xtensor/xmath.hpp>
-#include <xtensor/xview.hpp>
+#include <torch/torch.h>
 
 #include "geometry_msgs/msg/pose_stamped.hpp"
 #include "nav2_costmap_2d/costmap_2d_ros.hpp"
@@ -44,8 +42,8 @@ public:
 
   virtual void score(
     const geometry_msgs::msg::PoseStamped & robot_pose, const models::State & state,
-    const xt::xtensor<double, 3> & trajectories, const xt::xtensor<double, 2> & path,
-    xt::xtensor<double, 1> & costs,
+    const torch::Tensor & trajectories, const torch::Tensor & path,
+    torch::Tensor & costs,
     nav2_core::GoalChecker * goal_checker) = 0;
 
 protected:

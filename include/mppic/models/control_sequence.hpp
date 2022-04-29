@@ -5,7 +5,7 @@
 #include <array>
 #include <cstdint>
 
-#include <xtensor/xtensor.hpp>
+#include <torch/torch.h>
 
 #include "mppic/motion_models.hpp"
 
@@ -52,10 +52,10 @@ private:
  */
 struct ControlSequence
 {
-  xt::xtensor<double, 2> data;
+  torch::Tensor data;
   ControlSequnceIdxes idx;
 
-  void reset(unsigned int time_steps) {data = xt::zeros<double>({time_steps, idx.dim()});}
+  void reset(unsigned int time_steps) {data = torch::zeros({time_steps, idx.dim()});}
 };
 
 }  // namespace mppi::models
