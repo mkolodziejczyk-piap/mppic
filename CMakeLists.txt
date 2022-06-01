@@ -3,10 +3,7 @@ project(mppic)
 
 find_package(ament_cmake REQUIRED)
 
-# find_package(xtensor REQUIRED)
-# set(Torch_DIR "/opt/libtorch/share/cmake/Torch")
-set(Torch_DIR "/home/miron/libtorch/libtorch/share/cmake/Torch")
-find_package(Torch REQUIRED)
+find_package(ArrayFire)
 
 set(dependencies_pkgs
   rclcpp
@@ -35,22 +32,26 @@ endif()
 
 add_library(mppic SHARED
   src/controller.cpp
-  # src/optimizer.cpp
-  # src/critic_manager.cpp
+  src/optimizer.cpp
+  src/critic_manager.cpp
   # src/trajectory_visualizer.cpp
-  # src/path_handler.cpp
-  # src/parameters_handler.cpp
+  src/path_handler.cpp
+  src/parameters_handler.cpp
 )
 
-# add_library(critics SHARED
-#   src/critics/reference_trajectory_critic.cpp
+add_library(critics SHARED
+  src/critics/reference_trajectory_critic.cpp
 #   src/critics/goal_angle_critic.cpp
 #   src/critics/path_angle_critic.cpp
 #   src/critics/goal_critic.cpp
 #   src/critics/obstacles_critic.cpp
 #   src/critics/prefer_forward_critic.cpp
 #   src/critics/twirling_critic.cpp
-# )
+)
+
+# target_link_libraries(mppic ArrayFire::af)
+target_link_libraries(mppic ArrayFire::afcpu)
+
 
 # set(libraries mppic critics)
 set(libraries mppic)

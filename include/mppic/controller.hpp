@@ -55,7 +55,7 @@ protected:
   std::shared_ptr<tf2_ros::Buffer> tf_buffer_;
 
   std::unique_ptr<ParametersHandler> parameters_handler_;
-  // Optimizer optimizer_;
+  Optimizer optimizer_;
   PathHandler path_handler_;
   // TrajectoryVisualizer trajectory_visualizer_;
 

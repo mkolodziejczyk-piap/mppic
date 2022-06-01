@@ -4,9 +4,7 @@
 
 #include <string>
 #include <memory>
-// #include <xtensor/xtensor.hpp>
-// #include <xtensor/xview.hpp>
-#include <torch/torch.h>
+#include <arrayfire.h>
 
 #include "builtin_interfaces/msg/time.hpp"
 #include "geometry_msgs/msg/pose_stamped.hpp"
@@ -46,9 +44,9 @@ public:
     const geometry_msgs::msg::Twist & robot_speed, const nav_msgs::msg::Path & plan,
     nav2_core::GoalChecker * goal_checker);
 
-  torch::Tensor & getGeneratedTrajectories();
+  af::array & getGeneratedTrajectories();
 
-  torch::Tensor evalTrajectoryFromControlSequence(
+  af::array evalTrajectoryFromControlSequence(
     const geometry_msgs::msg::PoseStamped & robot_pose,
     const geometry_msgs::msg::Twist & robot_speed) const;
 
@@ -68,7 +66,7 @@ protected:
    * @return trajectories: tensor of shape [ batch_size_, time_steps_, 3 ]
    * where 3 stands for x, y, yaw
    */
-  torch::Tensor generateNoisedTrajectories(
+  af::array generateNoisedTrajectories(
     const geometry_msgs::msg::PoseStamped & robot_pose,
     const geometry_msgs::msg::Twist & robot_speed);
 
@@ -79,7 +77,7 @@ protected:
    * @return tensor of shape [ batch_size_, time_steps_, 2]
    * where 2 stands for v, w
    */
-  torch::Tensor generateNoisedControls() const;
+  af::array generateNoisedControls() const;
 
   void applyControlConstraints();
 
@@ -104,7 +102,7 @@ protected:
    */
   void propagateStateVelocitiesFromInitials(models::State & state) const;
 
-  torch::Tensor integrateStateVelocities(
+  af::array integrateStateVelocities(
     const models::State & state, const geometry_msgs::msg::PoseStamped & robot_pose) const;
 
   /**
@@ -113,7 +111,7 @@ protected:
    *
    * @param trajectories costs, tensor of shape [ batch_size ]
    */
-  void updateControlSequence(const torch::Tensor & costs);
+  void updateControlSequence(const af::array & costs);
 
   /**
    * @brief Get offseted control from control_sequence_
@@ -144,7 +142,7 @@ protected:
   std::unique_ptr<MotionModel> motion_model_;
   CriticManager critic_manager_;
 
-  torch::Tensor generated_trajectories_; // [ , , ]
+  af::array generated_trajectories_; // [ , , ]
   rclcpp::Logger logger_{rclcpp::get_logger("MPPIController")};
 };
 

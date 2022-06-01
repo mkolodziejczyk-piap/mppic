@@ -24,8 +24,8 @@ public:
    * @return predicted velocities of the robot: tensor of shape [batch_size, ... ]
    * where last dim could be 2 or 3 depending on motion model used
    */
-  virtual torch::Tensor predict(
-    const torch::Tensor & state, const models::StateIdxes & idx)
+  virtual af::array predict(
+    const af::array & state, const models::StateIdxes & idx)
   {
     return state.index({"...", Slice(idx.cbegin(), idx.cend())});
   }
@@ -48,8 +48,8 @@ public:
 class AckermannMotionModel : public MotionModel
 {
 public:
-  torch::Tensor predict(
-    const torch::Tensor & /*state*/, const models::StateIdxes & /*idx*/) override
+  af::array predict(
+    const af::array & /*state*/, const models::StateIdxes & /*idx*/) override
   {
     throw std::runtime_error("Ackermann motion model not yet implemented");
   }

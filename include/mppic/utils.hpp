@@ -6,7 +6,7 @@
 #include <chrono>
 #include <string>
 
-#include <torch/torch.h>
+#include <arrayfire.h>
 
 #include "geometry_msgs/msg/twist_stamped.hpp"
 #include "mppic/models/control_sequence.hpp"
@@ -41,12 +41,13 @@ geometry_msgs::msg::TwistStamped toTwistStamped(
   return twist;
 }
 
-inline torch::Tensor toTensor(const nav_msgs::msg::Path & path)
+inline af::array toTensor(const nav_msgs::msg::Path & path)
 {
   size_t path_size = path.poses.size();
   static constexpr size_t last_dim_size = 3;
 
-  torch::Tensor points = torch::empty({path_size, last_dim_size});
+  // af::array points(path_size, last_dim_size);
+  af::array points = af::constant(0, path_size, last_dim_size);
 
   for (size_t i = 0; i < path_size; ++i) {
     points(i, 0) = static_cast<double>(path.poses[i].pose.position.x);
@@ -61,7 +62,7 @@ inline torch::Tensor toTensor(const nav_msgs::msg::Path & path)
 inline bool withinPositionGoalTolerance(
   nav2_core::GoalChecker * goal_checker,
   const geometry_msgs::msg::PoseStamped & robot_pose_arg,
-  const torch::Tensor & path)
+  const af::array & path)
 {
   if (goal_checker) {
     geometry_msgs::msg::Pose pose_tol;
@@ -70,12 +71,13 @@ inline bool withinPositionGoalTolerance(
 
     const double & goal_tol = pose_tol.position.x;
 
-    torch::Tensor robot_pose = {
+    double robot_pose_data = {
       static_cast<double>(robot_pose_arg.pose.position.x),
       static_cast<double>(robot_pose_arg.pose.position.y)};
-    auto goal_pose = path.index({-1, Slice(0, 2)});
+    af::array robot_pose(2, robot_pose_data);
+    auto goal_pose = path(-1, af::seq(0, 2));
 
-    double dist_to_goal = torch::linalg::norm(robot_pose - goal_pose); //TODO axis
+    double dist_to_goal = af::norm(robot_pose - goal_pose); // af::hypot()
 
     if (dist_to_goal < goal_tol) {
       return true;
@@ -93,11 +95,18 @@ inline bool withinPositionGoalTolerance(
   * It takes and returns radians.
   *
   */
+
+/*
+# wrap to [-pi, pi]
+def angle_wrap(theta):
+  return (theta + jnp.pi) % (2 * jnp.pi) - jnp.pi
+*/
 template<typename T>
-torch::Tensor normalize_angles(const T & angles)
+af::array normalize_angles(const T & angles)
 {
-  torch::Tensor theta = (angles + M_PI).reminder(2.0 * M_PI);
-  return xt::where(theta <= 0.0, theta + M_PI, theta - M_PI);
+  af::array theta = (angles + M_PI).reminder(2.0 * M_PI) - M_PI;
+  // return xt::where(theta <= 0.0, theta + M_PI, theta - M_PI);
+  return theta;
 }
 
 
@@ -113,7 +122,7 @@ torch::Tensor normalize_angles(const T & angles)
   *
   */
 template<typename F, typename T>
-torch::Tensor shortest_angular_distance(
+af::array shortest_angular_distance(
   const F & from,
   const T & to)
 {

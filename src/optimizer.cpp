@@ -11,8 +11,6 @@
 #include "nav2_costmap_2d/cost_values.hpp"
 #include "nav2_costmap_2d/costmap_filters/filter_values.hpp"
 
-using namespace torch::indexing;
-
 namespace mppi
 {
 
@@ -146,17 +144,10 @@ void Optimizer::shiftControlSequence()
     return;
   }
 
-  using namespace xt::placeholders;  // NOLINT
-  xt::view(
-    control_sequence_.data,
-    xt::range(_, -settings_.control_sequence_shift_offset_), xt::all()) =
-    xt::view(
-    control_sequence_.data,
-    xt::range(settings_.control_sequence_shift_offset_, _),
-    xt::all());
+  control_sequence_.data = af::shift(control_sequence_.data, 0, 0, -settings_.control_sequence_shift_offset_);
 }
 
-torch::Tensor Optimizer::generateNoisedTrajectories(
+af::array Optimizer::generateNoisedTrajectories(
   const geometry_msgs::msg::PoseStamped & robot_pose,
   const geometry_msgs::msg::Twist & robot_speed)
 {
@@ -166,46 +157,53 @@ torch::Tensor Optimizer::generateNoisedTrajectories(
   return integrateStateVelocities(state_, robot_pose);
 }
 
-torch::Tensor Optimizer::generateNoisedControls() const
+af::array Optimizer::generateNoisedControls() const
 {
   auto & s = settings_;
-  auto vx_noises = torch::randn(
-    {s.batch_size_, s.time_steps_, 1U}) * s.sampling_std_.vx;
-  auto wz_noises = torch::randn(
-    {s.batch_size_, s.time_steps_, 1U}) * s.sampling_std_.wz;
 
   if (isHolonomic()) {
-    auto vy_noises = torch::randn(
-      {s.batch_size_, s.time_steps_, 1U}, 0.0, s.sampling_std_.vy);
-    return control_sequence_.data +
-           torch::cat({vx_noises, vy_noises, wz_noises}, -1);
+    //TODO class variable
+    double* sampling_std_data = {s.sampling_std_.vx, s.sampling_std_.vy, s.sampling_std_.wz};
+    af::array sampling_std = af::array(3, sampling_std_data);
+    auto vw_noises = af::randn(
+      3, s.batch_size_ * s.time_steps_);
+    gfor (af::seq i, vw_noises.dims(1)) {
+      // element-wise multiplication, https://arrayfire.org/docs/group__arith__func__mul.htm#ga8317504ec8b9c15d29b27cc77039cb69
+      vw_noises(af::span, i) *= sampling_std;
+    }
+  } else {
+    double* sampling_std_data = {s.sampling_std_.vx, s.sampling_std_.wz};
+    af::array sampling_std = af::array(2, sampling_std_data);
+    auto vw_noises = af::randn(
+      2, s.batch_size_ * s.time_steps_);
+    gfor (af::seq i, vw_noises.dims(1)) {
+      // element-wise multiplication, https://arrayfire.org/docs/group__arith__func__mul.htm#ga8317504ec8b9c15d29b27cc77039cb69
+      vw_noises(af::span, i) *= sampling_std;
+    }
   }
 
-  return control_sequence_.data +
-         torch::cat({vx_noises, wz_noises}, -1);
-
-  //TODO allocate control_sequence_ at once
-  /*
-
-
-  */
+  return control_sequence_.data + vw_noises;
 }
 
 bool Optimizer::isHolonomic() const {return motion_model_->isHolonomic();}
 
 void Optimizer::applyControlConstraints()
 {
-  auto vx = state_.getControlVelocitiesVX();
-  auto wz = state_.getControlVelocitiesWZ();
+
   auto & s = settings_;
 
-  if (isHolonomic()) {
-    auto vy = state_.getControlVelocitiesVY();
-    vy = torch::clip(vy, -s.constraints_.vy, s.constraints_.vy);
+  double* hi_data = {s.constraints_.vx, s.constraints_.vy, s.constraints_.wz};
+  af::array hi = af::array(3, hi_data);
+  af::array lo = -hi_data;
+
+  // af::clamp() https://arrayfire.org/docs/namespaceaf.htm#a5d4d2a41fad7d816b70be0e92270dc5f
+
+  // if (isHolonomic()) {
+
+  gfor (af::seq i, state.controls.dims(1)) {
+    state.controls(af::span, i) = af::clamp(state.controls(af::span, i), lo, hi);
   }
 
-  vx = torch::clip(vx, -s.constraints_.vx, s.constraints_.vx);
-  wz = torch::clip(wz, -s.constraints_.wz, s.constraints_.wz);
   //TODO one clip on whole state_ ?
 }
 
@@ -232,14 +230,14 @@ void Optimizer::propagateStateVelocitiesFromInitials(
   models::State & state) const
 {
   for (size_t i = 0; i < settings_.time_steps_ - 1; i++) {
-    auto curr_state = state.data.index({"...", i});
-    auto next_velocities = state.data.index({"...", i + 1, torch::Slice(state.idx.vbegin(), state.idx.vend())});
+    auto curr_state = state.data(af::span, i);
+    auto next_velocities = state.data(af::span, i + 1, af::seq(state.idx.vbegin(), state.idx.vend()));
 
     next_velocities = motion_model_->predict(curr_state, state.idx); //TODO where is real predict?
   }
 }
 
-torch::Tensor Optimizer::evalTrajectoryFromControlSequence(
+af::array Optimizer::evalTrajectoryFromControlSequence(
   const geometry_msgs::msg::PoseStamped & robot_pose,
   const geometry_msgs::msg::Twist & robot_speed) const
 {
@@ -253,55 +251,57 @@ torch::Tensor Optimizer::evalTrajectoryFromControlSequence(
   return xt::squeeze(integrateStateVelocities(state, robot_pose));
 }
 
-torch::Tensor Optimizer::integrateStateVelocities(
+af::array Optimizer::calcKinematics(
+  af::array se2,
+  af::array state)
+{
+    af::array state_dt = state * settings_.model_dt_;
+    af::array mult1 = af::join(state_dt[0], state_dt[0], 1.0);
+    af::array mult2 = af::join(af::cos(state_dt[1]), af::sin(state_dt[1]), 1.0);
+    af::array next_se2 = se2 * multi1 * multi2;
+    return se2;
+}
+
+af::array Optimizer::integrateStateVelocities(
   const models::State & state,
   const geometry_msgs::msg::PoseStamped & pose) const
 {
 
-  auto w = state.getVelocitiesWZ();
   double initial_yaw = tf2::getYaw(pose.pose.orientation);
-  torch::Tensor yaw =
-    torch::cumsum(w * settings_.model_dt_, 1) + initial_yaw;
-  torch::Tensor yaw_offseted = yaw;
+  double* trajecories_0_data = {pose.pose.position.x, pose.pose.position.y, initial_yaw};
+  af::array trajectories_0 = af::array(3, trajecories_0_data);
 
-  yaw_offseted.index_put_({"...", Slice(1, None)}) =
-    yaw.index({"...", Slice(None, -1)}); //TODO roll() ?
-  yaw_offseted.index_put_({"...", 0}) = initial_yaw;
+  af::array trajectories = af::constant(0, 3, settings_.batch_size_, settings_.time_steps_);
 
-  auto yaw_cos = torch::cos(yaw_offseted);
-  auto yaw_sin = torch::sin(yaw_offseted);
-
-  auto vx = state.getVelocitiesVX();
-  auto dx = vx * yaw_cos;
-  auto dy = vx * yaw_sin;
-
-  if (isHolonomic()) {
-    auto vy = state.getVelocitiesVY();
-    dx = dx - vy * yaw_sin;
-    dy = dy + vy * yaw_cos;
+  trajectories(af::span, af::span, 0) = af::tile(trajectories_0);
+  
+  for (size_t i = 0; i < settings_.time_steps_ - 1; i++) {
+    state_i = state.states(af::span, af::span, i);
+    trajectories_i = trajectories(af::span, af::span, i);
+    trajectories_i1 = trajectories(af::span, af::span, i+1);
+    gfor(af::seq j, settings_.batch_size_)
+    {
+      trajectories_i1(af::span, j) = calcKinematics(trajectories_i(j), state_i(af::span, j));
+    }
   }
 
-  auto x = pose.pose.position.x + torch::cumsum(dx * settings_.model_dt_, 1);
-  auto y = pose.pose.position.y + torch::cumsum(dy * settings_.model_dt_, 1);
+  return trajectories;
 
-  return torch::cat(
-    {x, y, yaw}, //TODO newaxis?
-    }); //TODO axis?
 }
 
-void Optimizer::updateControlSequence(const xt::xtensor<double, 1> & costs)
-{
-  using xt::evaluation_strategy::immediate;
 
-  auto && costs_normalized = costs - xt::amin(costs, immediate);
+
+void Optimizer::updateControlSequence(const af::array & costs)
+{
+  auto && costs_normalized = costs - af::min(costs);
   auto exponents =
-    xt::eval(xt::exp(-1 / settings_.temperature_ * costs_normalized));
-  auto softmaxes = exponents / xt::sum(exponents, immediate);
+    af::exp(-1 / settings_.temperature_ * costs_normalized);
+  auto softmaxes = exponents / af::sum(exponents);
   auto softmaxes_expanded =
-    xt::view(softmaxes, xt::all(), xt::newaxis(), xt::newaxis());
+    af::tile(softmaxes, 3, 1, settings_.time_steps_);
 
   control_sequence_.data =
-    xt::sum(state_.getControls() * softmaxes_expanded, 0);
+    af::sum(state_.controls * softmaxes_expanded, 0);
 }
 
 auto Optimizer::getControlFromSequence(const unsigned int offset)
@@ -338,7 +338,7 @@ void Optimizer::setMotionModel(const std::string & model)
   control_sequence_.idx.setLayout(motion_model_->isHolonomic());
 }
 
-torch::Tensor & Optimizer::getGeneratedTrajectories()
+af::array & Optimizer::getGeneratedTrajectories()
 {
   return generated_trajectories_;
 }

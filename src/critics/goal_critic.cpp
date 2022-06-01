@@ -18,22 +18,24 @@ void GoalCritic::initialize()
 void GoalCritic::score(
   const geometry_msgs::msg::PoseStamped & /*robot_pose*/,
   const models::State & /*state*/,
-  const torch::Tensor & trajectories,
-  const torch::Tensor & path,
-  torch::Tensor & costs,
+  const af::array & trajectories, // (num_trajectories, num_states, 3)
+  const af::array & path,
+  af::array & costs,
   nav2_core::GoalChecker * /*goal_checker*/)
 {
-  const auto goal_points = xt::view(path, -1, xt::range(0, 2));
+  const auto goal_points = path(-1, af::seq(0, 2));
 
   auto trajectories_end =
-    xt::view(trajectories, xt::all(), -1, xt::range(0, 2));
+    trajectories(af::span, -1, af::seq(0, 2));
 
   auto dim = trajectories_end.dimension() - 1;
 
-  auto && dists_trajectories_end_to_goal =
-    xt::norm_l2(std::move(trajectories_end) - goal_points, {dim});
+  af::array dists_trajectories_end_to_goal(trajectories.dims(0), 2);
+  gfor (seq i, dists_trajectories_end_to_goal.dims(0)) {
+    dists_trajectories_end_to_goal(i, 2) = af::norm(trajectories_end.row(i) - goal_points);
+  } 
 
-  costs += xt::pow(std::move(dists_trajectories_end_to_goal) * weight_, power_);
+  costs += af::pow(std::move(dists_trajectories_end_to_goal) * weight_, power_);
 }
 
 }  // namespace mppi::critics

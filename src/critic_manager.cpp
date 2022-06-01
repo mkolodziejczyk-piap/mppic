@@ -49,22 +49,22 @@ std::string CriticManager::getFullName(const std::string & name)
   return "mppi::critics::" + name;
 }
 
-torch::Tensor CriticManager::evalTrajectoriesScores(
-  const models::State & state, const torch::Tensor & trajectories,
+af::array CriticManager::evalTrajectoriesScores(
+  const models::State & state, const af::array & trajectories,
   const nav_msgs::msg::Path & global_plan,
   const geometry_msgs::msg::PoseStamped & robot_pose,
   nav2_core::GoalChecker * goal_checker) const
 {
   // Create evalated costs tensor
   size_t trajectories_count = trajectories.shape()[0];
-  torch::Tensor costs = torch::zeros({trajectories_count});
+  af::array costs = af::constant(0, trajectories_count);
 
   if (global_plan.poses.empty()) {
     return costs;
   }
 
   // Transform path into tensor for evaluation
-  torch::Tensor path = utils::toTensor(global_plan);
+  af::array path = utils::toTensor(global_plan);
 
   // Evaluate each trajectory by the critics
   for (size_t q = 0; q < critics_.size(); q++) {

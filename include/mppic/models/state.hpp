@@ -5,9 +5,8 @@
 #include <array>
 #include <cstdint>
 
-#include <torch/torch.h>
+#include <arrayfire.h>
 
-using namespace torch::indexing;
 
 namespace mppi::models
 {
@@ -84,103 +83,109 @@ private:
  **/
 struct State
 {
-  torch::Tensor data;
+  // af::array data;
+  af::array states;
+  af::array controls;
   StateIdxes idx;
 
   void reset(unsigned int batch_size, unsigned int time_steps)
   {
-    data = torch::zeros({batch_size, time_steps, idx.dim()});
+    // data = af::constant(0, batch_size, time_steps, idx.dim());
+    states = af::constant(0, idx.dim(), batch_size, time_steps);
+    controls = af::constant(0, idx.dim(), batch_size, time_steps);
+
+    // data = af::constant(0, idx.dim(), batch_size, time_steps);
   }
 
-  auto getVelocitiesVX() const
-  {
-    return data.index({"...", idx.vx()});
-  }
+  // auto getVelocitiesVX() const
+  // {
+  //   return data(af::span, idx.vx());
+  // }
 
-  auto getVelocitiesVX()
-  {
-    return data.index({"...", idx.vx()});
-  }
+  // auto getVelocitiesVX()
+  // {
+  //   return data(af::span, idx.vx());
+  // }
 
-  auto getVelocitiesVY()
-  {
-    return data.index({"...", idx.vy()});
-  }
+  // auto getVelocitiesVY()
+  // {
+  //   return data(af::span, ix.vy());
+  // }
 
-  auto getVelocitiesVY() const
-  {
-    return data.index({"...", idx.vy()});
-  }
+  // auto getVelocitiesVY() const
+  // {
+  //   return data(af::span, idx.vy());
+  // }
 
-  auto getVelocitiesWZ() const
-  {
-    return data.index({"...", idx.wz()});
-  }
+  // auto getVelocitiesWZ() const
+  // {
+  //   return data(af::span, idx.wz());
+  // }
 
-  auto getVelocitiesWZ()
-  {
-    return data.index({"...", idx.wz()});
-  }
+  // auto getVelocitiesWZ()
+  // {
+  //   return data(af::span, idx.wz());
+  // }
 
-  auto getControlVelocitiesVX() const
-  {
-    return data.index({"...", idx.cvx()});
-  }
+  // auto getControlVelocitiesVX() const
+  // {
+  //   return data(af::span, idx.cvx());
+  // }
 
-  auto getControlVelocitiesVX()
-  {
-    return data.index({"...", idx.cvx()});
-  }
+  // auto getControlVelocitiesVX()
+  // {
+  //   return data(af::span, idx.cvx());
+  // }
 
-  auto getControlVelocitiesVY()
-  {
-    return data.index({"...", idx.cvy()});
-  }
+  // auto getControlVelocitiesVY()
+  // {
+  //   return data(af::span, idx.cvy());
+  // }
 
-  auto getControlVelocitiesVY() const
-  {
-    return data.index({"...", idx.cvy()});
-  }
+  // auto getControlVelocitiesVY() const
+  // {
+  //   return data(af::span, idx.cvy());
+  // }
 
-  auto getControlVelocitiesWZ() const
-  {
-    return data.index({"...", idx.cwz()});
-  }
+  // auto getControlVelocitiesWZ() const
+  // {
+  //   return data(af::span, idx.cwz());
+  // }
 
-  auto getControlVelocitiesWZ()
-  {
-    return data.index({"...", idx.cwz()});
-  }
+  // auto getControlVelocitiesWZ()
+  // {
+  //   return data(af::span, idx.cwz());
+  // }
 
-  auto getTimeIntervals()
-  {
-    return data.index({"...", idx.dt()});
-  }
+  // auto getTimeIntervals()
+  // {
+  //   return data(af::span, idx.dt());
+  // }
 
-  auto getTimeIntervals() const
-  {
-    return data.index({"...", idx.dt()});
-  }
+  // auto getTimeIntervals() const
+  // {
+  //   return data(af::span, idx.dt());
+  // }
 
-  auto getControls() const
-  {
-    return data.index({"...", Slice(idx.cbegin(), idx.cend())});
-  }
+  // auto getControls() const
+  // {
+  //   return data(af::span, af::seq(idx.cbegin(), idx.cend()));
+  // }
 
-  auto getControls()
-  {
-    return data.index({"...", Slice(idx.cbegin(), idx.cend())});
-  }
+  // auto getControls()
+  // {
+  //   return data(af::span, af::seq(idx.cbegin(), idx.cend()));
+  // }
 
-  auto getVelocities() const
-  {
-    return data.index({"...", Slice(idx.vbegin(), idx.vend())});
-  }
+  // auto getVelocities() const
+  // {
+  //   return data(af::span, af::seq(idx.vbegin(), idx.vend()));
+  // }
 
-  auto getVelocities()
-  {
-    return data.index({"...", Slice(idx.vbegin(), idx.vend())});
-  }
+  // auto getVelocities()
+  // {
+  //   return data(af::span, af::seq(idx.vbegin(), idx.vend()));
+  // }
 };
 
 }  // namespace mppi::models
