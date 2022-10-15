@@ -111,7 +111,7 @@ void Optimizer::setSpeedLimit(double speed_limit, bool percentage)
 void Optimizer::reset()
 {
   state_.reset(settings_.batch_size_, settings_.time_steps_);
-  state_.getTimeIntervals() = settings_.model_dt_;
+  state_.dts = af::constant(settings_.model_dt_, settings_.batch_size_, settings_.time_steps_);
   control_sequence_.reset(settings_.time_steps_);
 
   RCLCPP_INFO(logger_, "Optimizer reset");
@@ -151,7 +151,7 @@ af::array Optimizer::generateNoisedTrajectories(
   const geometry_msgs::msg::PoseStamped & robot_pose,
   const geometry_msgs::msg::Twist & robot_speed)
 {
-  state_.getControls() = generateNoisedControls();
+  state_.controls = generateNoisedControls();
   applyControlConstraints();
   updateStateVelocities(state_, robot_speed);
   return integrateStateVelocities(state_, robot_pose);
@@ -161,20 +161,22 @@ af::array Optimizer::generateNoisedControls() const
 {
   auto & s = settings_;
 
+  af::array vw_noises;
+  
   if (isHolonomic()) {
     //TODO class variable
-    double* sampling_std_data = {s.sampling_std_.vx, s.sampling_std_.vy, s.sampling_std_.wz};
+    double sampling_std_data[] = {s.sampling_std_.vx, s.sampling_std_.vy, s.sampling_std_.wz};
     af::array sampling_std = af::array(3, sampling_std_data);
-    auto vw_noises = af::randn(
+    vw_noises = af::randn(
       3, s.batch_size_ * s.time_steps_);
     gfor (af::seq i, vw_noises.dims(1)) {
       // element-wise multiplication, https://arrayfire.org/docs/group__arith__func__mul.htm#ga8317504ec8b9c15d29b27cc77039cb69
       vw_noises(af::span, i) *= sampling_std;
     }
   } else {
-    double* sampling_std_data = {s.sampling_std_.vx, s.sampling_std_.wz};
+    double sampling_std_data[] = {s.sampling_std_.vx, s.sampling_std_.wz};
     af::array sampling_std = af::array(2, sampling_std_data);
-    auto vw_noises = af::randn(
+    vw_noises = af::randn(
       2, s.batch_size_ * s.time_steps_);
     gfor (af::seq i, vw_noises.dims(1)) {
       // element-wise multiplication, https://arrayfire.org/docs/group__arith__func__mul.htm#ga8317504ec8b9c15d29b27cc77039cb69
@@ -192,16 +194,16 @@ void Optimizer::applyControlConstraints()
 
   auto & s = settings_;
 
-  double* hi_data = {s.constraints_.vx, s.constraints_.vy, s.constraints_.wz};
+  double hi_data[] = {s.constraints_.vx, s.constraints_.vy, s.constraints_.wz};
   af::array hi = af::array(3, hi_data);
-  af::array lo = -hi_data;
+  af::array lo = -hi;
 
   // af::clamp() https://arrayfire.org/docs/namespaceaf.htm#a5d4d2a41fad7d816b70be0e92270dc5f
 
   // if (isHolonomic()) {
 
-  gfor (af::seq i, state.controls.dims(1)) {
-    state.controls(af::span, i) = af::clamp(state.controls(af::span, i), lo, hi);
+  gfor (af::seq i, state_.controls.dims(1)) {
+    state_.controls(af::span, i) = af::clamp(state_.controls(af::span, i), lo, hi);
   }
 
   //TODO one clip on whole state_ ?
@@ -217,12 +219,13 @@ void Optimizer::updateStateVelocities(
 void Optimizer::updateInitialStateVelocities(
   models::State & state, const geometry_msgs::msg::Twist & robot_speed) const
 {
-  state.getVelocitiesVX().index_put_({0}, robot_speed.linear.x);
-  state.getVelocitiesWZ().index_put_({0}, robot_speed.angular.z);
-
-  if (isHolonomic()) {
-    state.getVelocitiesVY().index_put_({0}, robot_speed.linear.y);
-  }
+  //TODO
+  // if (isHolonomic()) {
+  // }
+  
+  double robot_speed_data[] = {robot_speed.linear.x, robot_speed.linear.y, robot_speed.angular.z};
+  
+  state.states(af::span, af::span, 0) = af::array(3, robot_speed_data);
 }
 
 // this is trajectory rollout
@@ -230,10 +233,9 @@ void Optimizer::propagateStateVelocitiesFromInitials(
   models::State & state) const
 {
   for (size_t i = 0; i < settings_.time_steps_ - 1; i++) {
-    auto curr_state = state.data(af::span, i);
-    auto next_velocities = state.data(af::span, i + 1, af::seq(state.idx.vbegin(), state.idx.vend()));
-
-    next_velocities = motion_model_->predict(curr_state, state.idx); //TODO where is real predict?
+    auto curr_state = state.controls(af::span, af::span, i);
+    state.states(af::span, af::span, i + 1) = motion_model_->predict(curr_state, state.idx);
+    //TODO this is not real predict
   }
 }
 
@@ -244,22 +246,26 @@ af::array Optimizer::evalTrajectoryFromControlSequence(
   models::State state;
   state.idx.setLayout(motion_model_->isHolonomic());
   state.reset(1U, settings_.time_steps_);
-  state.getControls() = control_sequence_.data;
-  state.getTimeIntervals() = settings_.model_dt_;
+  state.dts = af::constant(settings_.model_dt_, 1U, settings_.time_steps_);
+  state.controls = control_sequence_.data;  
 
   updateStateVelocities(state, robot_speed);
-  return xt::squeeze(integrateStateVelocities(state, robot_pose));
+  // return xt::squeeze(integrateStateVelocities(state, robot_pose));
+  return integrateStateVelocities(state, robot_pose);
 }
 
+// kinematic part of dynamics and returned in trajectories
+// "dynamic" part of dynamics is calculated in propagateStateVelocitiesFromInitials and stored in states_.states
 af::array Optimizer::calcKinematics(
   af::array se2,
   af::array state)
 {
     af::array state_dt = state * settings_.model_dt_;
-    af::array mult1 = af::join(state_dt[0], state_dt[0], 1.0);
-    af::array mult2 = af::join(af::cos(state_dt[1]), af::sin(state_dt[1]), 1.0);
-    af::array next_se2 = se2 * multi1 * multi2;
-    return se2;
+    // https://arrayfire.org/docs/group__manip__func__join.htm
+    af::array mult1 = af::join(0, state_dt(0), state_dt(0), af::constant(1.0, 1));
+    af::array mult2 = af::join(0, af::cos(state_dt(1)), af::sin(state_dt(1)), af::constant(1.0, 1));
+    af::array next_se2 = se2 * mult1 * mult2;
+    return next_se2;
 }
 
 af::array Optimizer::integrateStateVelocities(
@@ -268,20 +274,20 @@ af::array Optimizer::integrateStateVelocities(
 {
 
   double initial_yaw = tf2::getYaw(pose.pose.orientation);
-  double* trajecories_0_data = {pose.pose.position.x, pose.pose.position.y, initial_yaw};
-  af::array trajectories_0 = af::array(3, trajecories_0_data);
+  double trajecories_0_data[] = {pose.pose.position.x, pose.pose.position.y, initial_yaw};
+  af::array trajectories_0 = af::array(3, 1, trajecories_0_data);
 
   af::array trajectories = af::constant(0, 3, settings_.batch_size_, settings_.time_steps_);
 
-  trajectories(af::span, af::span, 0) = af::tile(trajectories_0);
+  trajectories(af::span, af::span, 0) = af::tile(trajectories_0, 1, settings_.batch_size_);
   
-  for (size_t i = 0; i < settings_.time_steps_ - 1; i++) {
-    state_i = state.states(af::span, af::span, i);
-    trajectories_i = trajectories(af::span, af::span, i);
-    trajectories_i1 = trajectories(af::span, af::span, i+1);
-    gfor(af::seq j, settings_.batch_size_)
+  for (size_t j = 0; j < settings_.time_steps_ - 1; j++) {
+    auto state_j = state.states(af::span, af::span, j);
+    auto trajectories_j = trajectories(af::span, af::span, j);
+    auto trajectories_j1 = trajectories(af::span, af::span, j+1);
+    gfor(af::seq i, settings_.batch_size_)
     {
-      trajectories_i1(af::span, j) = calcKinematics(trajectories_i(j), state_i(af::span, j));
+      trajectories_j1(af::span, i) = calcKinematics(trajectories_j(af::span, i), state_j(af::span, i));
     }
   }
 

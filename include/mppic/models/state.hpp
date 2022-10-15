@@ -86,13 +86,15 @@ struct State
   // af::array data;
   af::array states;
   af::array controls;
+  af::array dts;
   StateIdxes idx;
 
   void reset(unsigned int batch_size, unsigned int time_steps)
   {
     // data = af::constant(0, batch_size, time_steps, idx.dim());
-    states = af::constant(0, idx.dim(), batch_size, time_steps);
-    controls = af::constant(0, idx.dim(), batch_size, time_steps);
+    states = af::constant(0, 3, batch_size, time_steps);
+    controls = af::constant(0, 3, batch_size, time_steps);
+    // dts = af::constant(0, 1, batch_size, time_steps);
 
     // data = af::constant(0, idx.dim(), batch_size, time_steps);
   }

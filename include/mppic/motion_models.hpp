@@ -27,7 +27,7 @@ public:
   virtual af::array predict(
     const af::array & state, const models::StateIdxes & idx)
   {
-    return state.index({"...", Slice(idx.cbegin(), idx.cend())});
+    return state;
   }
 
   virtual bool isHolonomic() const = 0;

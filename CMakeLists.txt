@@ -39,15 +39,15 @@ add_library(mppic SHARED
   src/parameters_handler.cpp
 )
 
-add_library(critics SHARED
-  src/critics/reference_trajectory_critic.cpp
+# add_library(critics SHARED
+#   src/critics/reference_trajectory_critic.cpp
 #   src/critics/goal_angle_critic.cpp
 #   src/critics/path_angle_critic.cpp
 #   src/critics/goal_critic.cpp
 #   src/critics/obstacles_critic.cpp
 #   src/critics/prefer_forward_critic.cpp
 #   src/critics/twirling_critic.cpp
-)
+# )
 
 # target_link_libraries(mppic ArrayFire::af)
 target_link_libraries(mppic ArrayFire::afcpu)

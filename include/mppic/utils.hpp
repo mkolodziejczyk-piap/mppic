@@ -71,7 +71,7 @@ inline bool withinPositionGoalTolerance(
 
     const double & goal_tol = pose_tol.position.x;
 
-    double robot_pose_data = {
+    double robot_pose_data[] = {
       static_cast<double>(robot_pose_arg.pose.position.x),
       static_cast<double>(robot_pose_arg.pose.position.y)};
     af::array robot_pose(2, robot_pose_data);

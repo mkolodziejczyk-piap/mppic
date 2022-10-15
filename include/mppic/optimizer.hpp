@@ -105,6 +105,10 @@ protected:
   af::array integrateStateVelocities(
     const models::State & state, const geometry_msgs::msg::PoseStamped & robot_pose) const;
 
+  af::array calcKinematics(
+    af::array se2,
+    af::array state);    
+
   /**
    * @brief Update control_sequence_ with state controls weighted by costs
    * using softmax function
